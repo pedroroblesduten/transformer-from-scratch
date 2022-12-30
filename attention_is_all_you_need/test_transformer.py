@@ -1,7 +1,7 @@
 from transformers import AutoTokenizer, AutoConfig
 import torch 
 import torch.nn as nn
-from blocks import TransformerEncoderLayer
+from blocks import TransformerEncoderLayer, TransformerDecoderLayer
 
 model_ckpt = 'bert-base-uncased'
 tokeninzer = AutoTokenizer.from_pretrained(model_ckpt)
@@ -15,14 +15,15 @@ embedding_dim = config.hidden_size
 n_heads = 8
 
 encoder_layer = TransformerEncoderLayer(h_size, embedding_dim, n_heads)
-size = encoder_layer(inputs_emb).size()
+enc_out = encoder_layer(inputs_emb)
+print(f'Shape de saida do encoder: {enc_out.shape}')
+
+decoder_layer = TransformerDecoderLayer(h_size, embedding_dim, n_heads)
+dec_out = decoder_layer(enc_out, inputs_emb)
+print(f'Shape de saida do decoder: {dec_out.shape}')
+
+print('--- ENCODER LAYER --')
 print(encoder_layer)
-print(size)
-print('--')
+print('-- DECODER LAYER --')
+print(decoder_layer)
 
-
-
-print(text)
-print(inputs.input_ids)
-print(token_emb)
-print(inputs_emb.size())
