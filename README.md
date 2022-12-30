@@ -1,1 +1,1 @@
-Implementation of some transformer architecture for educational purpose and deep understading
+Implementation of some transformer architecture for educational purpose and deep understanding
