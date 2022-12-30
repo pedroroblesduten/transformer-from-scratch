@@ -71,7 +71,7 @@ class TransformerDecoderLayer(nn.Module):
         if self.verbose:
             print(f'Input shape for decoder layer: {dec_in.shape}')
 
-        h = self.masked_attention(enc_out, enc_out, dec_in)
+        h = self.masked_attention(dec_in, dec_in, dec_in)
         if self.verbose:
             print(f'Shape after masked_attetion: {x.shape}')
             
@@ -83,7 +83,7 @@ class TransformerDecoderLayer(nn.Module):
         if self.verbose:
             print(f'Shape after layer_norm1: {x.shape}')
 
-        h = self.attention(x, x, x)
+        h = self.attention(enc_out, enc_out, x)
         if self.verbose:
             print(f'Shape after attention: {x.shape}')
 
