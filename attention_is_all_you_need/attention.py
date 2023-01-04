@@ -36,6 +36,7 @@ class AttentionHead(nn.Module):
 class MultiHeadAttention(nn.Module):
     def __init__(self, embedding_dim, n_heads, dropout=0.1, mask=None, verbose=False):
         super().__init__()
+        assert embedding_dim % n_heads == 0
         self.mask = mask
         self.verbose = True
         self.embedding_dim = embedding_dim
