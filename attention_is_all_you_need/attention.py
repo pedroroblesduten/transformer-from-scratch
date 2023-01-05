@@ -16,7 +16,6 @@ class AttentionHead(nn.Module):
 
         # Calculating Q*V/sqrt(d_k)
         scores = torch.bmm(query, key.transpose(1, 2)) / sqrt(d_k)
-
         if mask is not None:
             scores = scores.masked_fill(mask==0, float("-inf"))
 

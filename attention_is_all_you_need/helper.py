@@ -39,16 +39,16 @@ class PositionalEnconding(nn.Module):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
 
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, 1).unsqueeze(1)
-        div_term  = torch.pow(10000, 2 * (torch.arange(0, d_model, 2)/d_model))
-        pe[:, 0::2] = torch.sin(position*div_term)
-        pe[:, 1::2] = torch.cos(position*div_term)
+        self.pe = torch.zeros(max_len, d_model)
+        self.position = torch.arange(0, max_len, 1).unsqueeze(1)
+        self.div_term  = torch.pow(10000, 2 * (torch.arange(0, d_model, 2)/d_model))
        
     def forward(self, x):
+        self.pe[:, 0::2] = torch.sin(self.position*self.div_term)
+        self.pe[:, 1::2] = torch.cos(self.position*self.div_term)
         x = x + self.pe[: x.shape[1]].requires_grad_(False)
         x = self.dropout(x)
-        return
+        return x
 
 
 class Embeddings(nn.Module):
@@ -76,3 +76,12 @@ class TokenizerHuggingFace(nn.Module):
 
         return text_emb
 
+class Generator(nn.Module):
+    def __init__(self, embedding_dim, vocab_size):
+        super().__init__()
+        self.proj = nn.Linear(embedding_dim, vocab_size)
+
+    def forward(self, x):
+        x = self.proj(x)
+        x = F.log_softmax(x, dim=-1)
+        return x

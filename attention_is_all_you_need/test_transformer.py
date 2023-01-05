@@ -2,7 +2,7 @@ from transformers import AutoTokenizer, AutoConfig
 import torch 
 import torch.nn as nn
 from blocks import TransformerEncoderLayer, TransformerDecoderLayer, EncoderDecoder
-from helper import TokenizerHuggingFace
+from helper import TokenizerHuggingFace, PositionalEnconding
 
 model_ckpt = 'bert-base-uncased'
 tokeninzer = AutoTokenizer.from_pretrained(model_ckpt)
@@ -26,8 +26,13 @@ encoder_decoder = EncoderDecoder(embedding_dim, n_heads, verbose=True)
 out = encoder_decoder(inputs_emb, inputs_emb)
 print('Shape de saida do encoder_decoder')
 
+
+post_enc = PositionalEnconding(embedding_dim, 0.01)
+token_pe = post_enc(text_emb)
+print(token_pe)
+print(token_pe.shape)
+
 print('--- ENCODER LAYER --')
 # print(encoder_layer)
 print('-- DECODER LAYER --')
-# print(decoder_layer)
-
+# print(decoder_lay

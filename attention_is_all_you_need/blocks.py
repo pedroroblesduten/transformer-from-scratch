@@ -70,7 +70,7 @@ class TransformerDecoderLayer(nn.Module):
 
         h = self.masked_attention(dec_in, dec_in, dec_in, mask)
         if self.verbose:
-            print(f'Shape after masked_attetion: {x.shape}')
+            print(f'Shape after masked_attetion: {h.shape}')
             
         x = dec_in + h
         if self.verbose:
@@ -108,7 +108,7 @@ class TransformerDecoderLayer(nn.Module):
 
 
 class EncoderDecoder(nn.Module):
-    def __init__(self, embedding_dim, n_heads=8, verbose=False, N=6):
+    def __init__(self, embedding_dim, n_heads, verbose, N):
         super().__init__()
         self.verbose = verbose
         self.encoder_layers = nn.ModuleList([TransformerEncoderLayer(embedding_dim, verbose=self.verbose) for _ in range(N)])
@@ -117,7 +117,7 @@ class EncoderDecoder(nn.Module):
     def _make_mask(self, y):
         batch, y_len, emb_dim = y.shape
         mask = torch.tril(torch.ones(y_len, y_len)).unsqueeze(0)
-        return mask.reshape(batch, 1, y_len, y_len)
+        return mask.reshape(batch, y_len, y_len)
 
     def forward(self, x, y):
         for enc in self.encoder_layers:
@@ -126,7 +126,7 @@ class EncoderDecoder(nn.Module):
     
         for dec in self.decoder_layers:
             y = dec(x, y, self._make_mask(y))
-        print(f'Shape de saída do decoder: {x.shape}')
+        print(f'Shape de saída do decoder: {y.shape}')
 
         return y
 
