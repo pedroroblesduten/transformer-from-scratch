@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from math import sqrt
+from transformers import AutoTokenizer, AutoConfig
 
 class FeedForward(nn.Module):
     def __init__(self, h_size, inter_size, dropout=0.1):
@@ -39,19 +40,13 @@ class PositionalEnconding(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len).unsqueeze(1)
-        div_term  = torch.exp(
-            torch.arange(0, d_model, 2) * -(math.log(10000.0)/d_model)
-        )
+        position = torch.arange(0, max_len, 1).unsqueeze(1)
+        div_term  = torch.pow(10000, 2 * (torch.arange(0, d_model, 2)/d_model))
         pe[:, 0::2] = torch.sin(position*div_term)
         pe[:, 1::2] = torch.cos(position*div_term)
-        
-        pe = pe.unsqueeze(0)
-
-        self.register_buffer("pe", pe)
-
+       
     def forward(self, x):
-        x = x + self.pe[:, : x.size(1)].requires_grad_(False)
+        x = x + self.pe[: x.shape[1]].requires_grad_(False)
         x = self.dropout(x)
         return
 
@@ -65,4 +60,19 @@ class Embeddings(nn.Module):
     def forward(self, x):
         return self.lut(x)*sqrt(self.d_model)
 
+class TokenizerHuggingFace(nn.Module):
+    def __init__(self, model_name='bert-base-uncased', special_tokens=True):
+        super().__init__()
+    
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.config = AutoConfig.from_pretrained(model_name)
+        self.special_tokens = special_tokens
+
+    def forward(self, text):
+
+        text = self.tokenizer(text, return_tensors='pt', add_special_tokens=self.special_tokens)
+        token_emb = nn.Embedding(self.config.vocab_size, self.config.hidden_size)
+        text_emb = token_emb(text.input_ids)
+
+        return text_emb
 

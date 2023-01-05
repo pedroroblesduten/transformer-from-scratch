@@ -1,7 +1,8 @@
 from transformers import AutoTokenizer, AutoConfig
 import torch 
 import torch.nn as nn
-from blocks import TransformerEncoderLayer, TransformerDecoderLayer
+from blocks import TransformerEncoderLayer, TransformerDecoderLayer, EncoderDecoder
+from helper import TokenizerHuggingFace
 
 model_ckpt = 'bert-base-uncased'
 tokeninzer = AutoTokenizer.from_pretrained(model_ckpt)
@@ -10,20 +11,23 @@ inputs = tokeninzer(text, return_tensors='pt', add_special_tokens=False)
 config = AutoConfig.from_pretrained(model_ckpt)
 token_emb = nn.Embedding(config.vocab_size, config.hidden_size)
 inputs_emb = token_emb(inputs.input_ids)
-h_size = config.hidden_size
 embedding_dim = config.hidden_size
 n_heads = 8
 
-encoder_layer = TransformerEncoderLayer(h_size, embedding_dim, n_heads)
-enc_out = encoder_layer(inputs_emb)
-print(f'Shape de saida do encoder: {enc_out.shape}')
+print(inputs_emb)
+my_tokenizer = TokenizerHuggingFace(special_tokens=False)
+text_emb = my_tokenizer(text)
+print(text_emb)
 
-decoder_layer = TransformerDecoderLayer(h_size, embedding_dim, n_heads)
-dec_out = decoder_layer(enc_out, inputs_emb)
-print(f'Shape de saida do decoder: {dec_out.shape}')
+print(f'Shape tokenizer livro: {inputs_emb.shape}')
+print(f'Shape my tokenizer: {text_emb.shape}')
+
+encoder_decoder = EncoderDecoder(embedding_dim, n_heads, verbose=True)
+out = encoder_decoder(inputs_emb, inputs_emb)
+print('Shape de saida do encoder_decoder')
 
 print('--- ENCODER LAYER --')
-print(encoder_layer)
+# print(encoder_layer)
 print('-- DECODER LAYER --')
-print(decoder_layer)
+# print(decoder_layer)
 
