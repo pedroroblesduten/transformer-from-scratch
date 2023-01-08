@@ -5,7 +5,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math.sqrt as sqrt
+from math import sqrt
+from dataclasses import dataclass
 
 class AttentionHead(nn.Module):
     def __init__(self, embedding_dim, head_dim, dropout):
@@ -110,7 +111,7 @@ class GPT(nn.Module):
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.embedding_dim),
-            wbe = nn.Embedding(config.block_size, config.embedding_dim)
+            wbe = nn.Embedding(config.block_size, config.embedding_dim),
             drop = nn.Dropout(config.dropout),
             h = nn.ModuleDict([Block(config) for _ in range(config.n_layers)]),
             ln_f = nn.LayerNorm(config.embedding_dim),
