@@ -9,39 +9,43 @@ from math import sqrt
 from dataclasses import dataclass
 
 class AttentionHead(nn.Module):
-    def __init__(self, embedding_dim, head_dim, dropout):
+    def __init__(self, embedding_dim, head_dim, dropout, block_size):
         super().__init__()
         
         self.linear_Q = nn.Linear(embedding_dim, head_dim)
         self.linear_K = nn.Linear(embedding_dim, head_dim)
         self.linear_V = nn.Linear(embedding_dim, head_dim)
         self.dropout = nn.Dropout(dropout)
+        self.block_size = block_size
 
-    def scaled_dot_product_attetion(self, query, key, value, mask, dropout):
+    def scaled_dot_product_attetion(self, query, key, value, masked):
         B, T, d_k = query.size()
 
         #Calculating QV/sqrt(d_k)
-        scores = torch.bmm(query, key.transpose(1, 2))/sqrt(d_K)
+        
+        scores = torch.bmm(query, key.transpose(1, 2))/sqrt(d_k)
     
         self.register_buffer("bias",
-                             torch.tril(torch.ones(config.block_size, config.block_size))
-                                    .view(1, 1, config.block_size, config.block_size))
-        att_matrix = F.softmax(scores, dim=-1)
-        if mask == True:
-            att_matrix = att_matrix.masked_fill(self.bias[:,:,:T,:T]==0, float('-inf'))
+                             torch.tril(torch.ones(self.block_size, self.block_size).to(scores.device))
+                                    .view(1, 1, self.block_size, self.block_size))
         
-        if dropout is not None:
-            att_matrix = self.dropout(att_matrix)
-
+        att_matrix = F.softmax(scores, dim=-1)
+        
+        if masked == True:
+            att_matrix = att_matrix.masked_fill(self.bias[0,:,:T,:T]==0, float('-Inf'))
+        
+        
+        att_matrix = self.dropout(att_matrix)
         output = torch.bmm(att_matrix, value)
-
+        
         return output
 
-    def forward(self, Q, K, V, mask):
+    def forward(self, x, mask):
+        
         one_head_attetion = self.scaled_dot_product_attetion(
-            self.linear_Q(Q),
-            self.linear_V(V),
-            self.linear_K(K),
+            self.linear_Q(x),
+            self.linear_V(x),
+            self.linear_K(x),
             mask
         )
         return one_head_attetion
@@ -49,19 +53,20 @@ class AttentionHead(nn.Module):
 class MultiHeadAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
-        assert embedding_dim % n_heads == 0
+        assert config.embedding_dim % config.n_heads == 0
+        self.block_size = config.block_size
         self.embedding_dim = config.embedding_dim
         self.n_heads = config.n_heads
-        self.head_dim = cofig.embedding_dim//cofig.n_heads
+        self.head_dim = config.embedding_dim//config.n_heads
         self.heads = nn.ModuleList([
-            AttentionHead(self.embedding_dim, self.head_dim)
+            AttentionHead(self.embedding_dim, self.head_dim, config.dropout, self.block_size)
             for _ in range(self.n_heads )
         ])
         self.output_linear = nn.Linear(self.embedding_dim, self.embedding_dim)
         self.resid_dropout = nn.Dropout(config.dropout)
 
-    def forward(self, Q, K, V, mask=True):
-        x = torch.cat([head(Q, K, V, mask) for head in self.heads], dim=-1)
+    def forward(self, x, masked=True):
+        x = torch.cat([head(x, masked) for head in self.heads], dim=-1)
         x = self.resid_dropout(self.output_linear(x))
         return x
 
@@ -69,9 +74,9 @@ class FeedForward(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.linear1 = nn.Linear(config.embedding_dim, 4*config.embedding_dim)
-        self.linear2 = nn.Linear(4*config.embedding_dim, embedding_dim)
+        self.linear2 = nn.Linear(4*config.embedding_dim, config.embedding_dim)
         self.gelu = nn.GELU()
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
         x = self.linear1(x)
@@ -82,23 +87,26 @@ class FeedForward(nn.Module):
         
 class Block(nn.Module):
     def __init__(self, config):
+        super().__init__()
         self.layer_norm1 = nn.LayerNorm(config.embedding_dim)
         self.layer_norm2 = nn.LayerNorm(config.embedding_dim)
-        self.attention = MultiHeadAttention(cofig)
+        self.attention = MultiHeadAttention(config)
         self.feed_forward = FeedForward(config)
 
     def forward(self, x):
+        
         x = x + self.attention(self.layer_norm1(x))
         x = x + self.feed_forward(self.layer_norm2(x))
+        return x
 
 @dataclass
 class GPTconfig:
     block_size: int = 1024
-    vocab_size: int = 50257
+    vocab_size: int = 5025
     n_layers: int = 12
     n_heads: int = 12
     embedding_dim: int = 768
-    dropout: int = 0.1
+    dropout: float = 0.1
 
     
 # From nanoGPT: https://github.com/karpathy/nanoGPT/blob/master/model.py
@@ -111,9 +119,9 @@ class GPT(nn.Module):
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.embedding_dim),
-            wbe = nn.Embedding(config.block_size, config.embedding_dim),
+            wpe = nn.Embedding(config.block_size, config.embedding_dim),
             drop = nn.Dropout(config.dropout),
-            h = nn.ModuleDict([Block(config) for _ in range(config.n_layers)]),
+            h = nn.ModuleList([Block(config) for _ in range(config.n_layers)]),
             ln_f = nn.LayerNorm(config.embedding_dim),
         ))
         self.lm_head = nn.Linear(config.embedding_dim, config.vocab_size, bias=False)
@@ -195,20 +203,20 @@ class GPT(nn.Module):
 
     @torch.no_grad()
     def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
-
+        
         for _ in range(max_new_tokens):
             idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
             # Run the model
             logits, _ = self(idx_cond)
-            logits = logits[:, -1, :]
+            logits = logits[:, -1, :]/temperature
             if top_k is not None:
                 v, _ = torch.topk(logits, top_k)
-                logits[logits<v[:, [-1]]] = -float('inf')
+                logits[logits<v[:, [-1]]] = -float('Inf')
 
-                probs = F.softmax(logits, dim=-1)
-                ids_next = torch.multinomial(probs, num_samples=1)
-                idx = torch.cat((idx, idx_next), dim=1)
-
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx = torch.cat((idx, idx_next), dim=1)
+        return idx
 
 
 
